@@ -174,35 +174,63 @@ def score_cuisine(client, maid_flags):
 
 def score_bonuses(row):
     bonuses, explanations = 0, []
-    langs = []
-    if row.get("maidspeaks_arabic", 0) == 1:
-        bonuses += 1; langs.append("Arabic")
-    if row.get("maidspeaks_english", 0) == 1:
-        bonuses += 1; langs.append("English")
-    if row.get("maidspeaks_french", 0) == 1:
-        bonuses += 1; langs.append("French")
-    if langs:
-        explanations.append("Bonus: speaks " + ", ".join(langs))
-    exp = row.get("years_of_experience", 0)
-    if exp >= 5:
-        bonuses += 2; explanations.append(f"Bonus: {exp} years experience")
-    elif exp >= 2:
-        bonuses += 1; explanations.append(f"Bonus: {exp} years experience")
-    edu = row.get("maidpref_education", "unspecified")
-    if edu in ["school", "both", "university"]:
-        bonuses += 1; explanations.append(f"Bonus: education = {edu}")
-    pers = row.get("maidpref_personality", "unspecified")
-    if pers != "unspecified":
-        bonuses += 1; explanations.append(f"Bonus: personality = {pers.replace('+', ', ')}")
-    travel = row.get("maidpref_travel", "unspecified")
-    if travel == "travel":
-        bonuses += 1; explanations.append("Bonus: open to travel")
-    elif travel in ["relocate", "travel_and_relocate"]:
-        bonuses += 2; explanations.append("Bonus: open to travel & relocation")
-    smoking = row.get("maidpref_smoking", "unspecified")
+
+    # --- Language bonus ---
+    num_langs = row.get("num_languages", 0)
+    if num_langs > 2:
+        bonuses += 2
+        explanations.append(f"Bonus: speaks {num_langs} languages")
+
+    # --- Travel & relocation preference ---
+    travel = str(row.get("maidpref_travel", "unspecified")).lower()
+    if travel in ["travel", "relocate", "travel_and_relocate"]:
+        bonuses += 2
+        explanations.append("Bonus: open to travel/relocation")
+
+    # --- Smoking preference ---
+    smoking = str(row.get("maidpref_smoking", "unspecified")).lower()
     if smoking == "non_smoker":
-        bonuses += 1; explanations.append("Bonus: non-smoker")
-    return min(bonuses, BONUS_CAP), explanations
+        bonuses += 1
+        explanations.append("Bonus: non-smoker")
+
+    # --- Education level ---
+    edu = str(row.get("maidpref_education", "unspecified")).lower()
+    if edu == "school":
+        bonuses += 1
+        explanations.append("Bonus: educated (school level)")
+    elif edu == "university":
+        bonuses += 1
+        explanations.append("Bonus: university-educated")
+    elif edu == "both":
+        bonuses += 2
+        explanations.append("Bonus: school + university educated")
+
+    # --- Personality traits ---
+    pers = str(row.get("maidpref_personality", "")).lower()
+    if "energetic" in pers:
+        bonuses += 1
+        explanations.append("Bonus: energetic personality")
+    if "no_attitude" in pers:
+        bonuses += 1
+        explanations.append("Bonus: respectful / no attitude")
+    if "no_tiktok" in pers:
+        bonuses += 1
+        explanations.append("Bonus: disciplined / no TikTok use")
+    if "veg_friendly" in pers:
+        bonuses += 1
+        explanations.append("Bonus: vegetarian-friendly")
+
+    # --- Experience ---
+    exp = row.get("years_of_experience", 0)
+    if exp > 5:
+        bonuses += 2
+        explanations.append(f"Bonus: {exp} years of experience")
+
+    # Cap total bonus
+    final_bonus = min(bonuses, BONUS_CAP)
+
+    return final_bonus, explanations
+
 
 def calculate_score(row):
     theme_scores = {}
