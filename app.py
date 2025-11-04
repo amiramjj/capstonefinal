@@ -713,3 +713,107 @@ if uploaded_file:
                           (pets, living, or nationality) are dragging down current match quality.
                         """
                     )
+
+            # -------------------------------
+            # Top Drivers of Match vs. Mismatch
+            # -------------------------------
+            st.markdown("### 🔎 Top Drivers of Match vs. Mismatch")
+            
+            from collections import Counter
+            import plotly.express as px
+            
+            # Combine all theme explanation columns
+            reason_columns = [
+                "Household & Kids Reason",
+                "Special Cases Reason",
+                "Pets Reason",
+                "Living Reason",
+                "Nationality Reason",
+                "Cuisine Reason"
+            ]
+            
+            # --- Classify reasons into broad themes ---
+            def classify_theme(reason: str):
+                r = str(reason).lower()
+                if any(k in r for k in ["baby", "kids", "household"]):
+                    return "Household & Kids"
+                if any(k in r for k in ["special", "elderly", "caregiving"]):
+                    return "Special Cases"
+                if any(k in r for k in ["pet", "cat", "dog"]):
+                    return "Pets"
+                if "living" in r or "room" in r or "abu dhabi" in r:
+                    return "Living Arrangement"
+                if "nationality" in r or "prefers" in r:
+                    return "Nationality"
+                if "cuisine" in r or "cooking" in r:
+                    return "Cuisine"
+                return None
+            
+            # --- Extract all reasons and classify ---
+            match_reasons, mismatch_reasons = [], []
+            
+            for _, row in df.iterrows():
+                for col in reason_columns:
+                    reason_text = str(row[col]).lower()
+            
+                    if any(word in reason_text for word in ["perfect", "bonus", "match", "partial", "good"]):
+                        match_reasons.append(classify_theme(reason_text))
+                    elif any(word in reason_text for word in ["mismatch", "refuses", "not", "bad", "wrong"]):
+                        mismatch_reasons.append(classify_theme(reason_text))
+            
+            # Filter out None
+            match_reasons = [r for r in match_reasons if r]
+            mismatch_reasons = [r for r in mismatch_reasons if r]
+            
+            # --- Count frequencies ---
+            match_counts = Counter(match_reasons)
+            mismatch_counts = Counter(mismatch_reasons)
+            
+            # --- Build dataframes ---
+            match_df = pd.DataFrame(match_counts.items(), columns=["Theme", "Count"])
+            mismatch_df = pd.DataFrame(mismatch_counts.items(), columns=["Theme", "Count"])
+            
+            match_df["Percent"] = match_df["Count"] / match_df["Count"].sum() * 100
+            mismatch_df["Percent"] = mismatch_df["Count"] / mismatch_df["Count"].sum() * 100
+            
+            # Sort ascending for visualization
+            match_df = match_df.sort_values("Percent", ascending=True)
+            mismatch_df = mismatch_df.sort_values("Percent", ascending=True)
+            
+            # --- Plot side-by-side charts ---
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                fig_mismatch = px.bar(
+                    mismatch_df,
+                    x="Percent", y="Theme",
+                    orientation="h",
+                    color="Percent",
+                    color_continuous_scale="Blues",
+                    title="Top Drivers of Mismatch"
+                )
+                fig_mismatch.update_layout(coloraxis_showscale=False)
+                st.plotly_chart(fig_mismatch, use_container_width=True)
+            
+            with col2:
+                fig_match = px.bar(
+                    match_df,
+                    x="Percent", y="Theme",
+                    orientation="h",
+                    color="Percent",
+                    color_continuous_scale="Greens",
+                    title="Top Drivers of Match"
+                )
+                fig_match.update_layout(coloraxis_showscale=False)
+                st.plotly_chart(fig_match, use_container_width=True)
+            
+            # Caption
+            st.caption(
+                """
+                These charts summarize which **themes most frequently drive strong alignment or mismatches**:
+                - The **left** shows where placements fail to align (common conflict areas).  
+                - The **right** shows which themes consistently reinforce strong matches.  
+                Together, they help pinpoint improvement priorities in client–maid matching logic.
+                """
+            )
+            
