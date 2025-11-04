@@ -11,7 +11,7 @@ st.set_page_config(layout="wide")
 # -------------------------------
 THEME_WEIGHTS = {
     "household_kids": 9,
-    "special_cases": 8,
+    "special_cases": 10,
     "pets": 8,
     "living": 9,
     "nationality": 8,
