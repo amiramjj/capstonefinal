@@ -567,34 +567,41 @@ if uploaded_file:
     # Bridge: Prepare data for Summary Metrics tab
     # --------------------------------------------
     
-    # --- Case 1: Use Tab 1 results if they exist
-    if "results_df" in locals() and "Final Score %" in results_df.columns:
+    # Initialize to avoid reference errors
+    df, best_client_df = None, None
+    
+    # --- Case 1: Both datasets available
+    if (
+        "results_df" in locals() and "optimal_df" in locals()
+        and "Final Score %" in results_df.columns
+        and "Final Score %" in optimal_df.columns
+    ):
         df = results_df.copy()
         df["match_score_pct"] = df["Final Score %"]
-        st.success("Using Tab 1 Matching Scores for summary metrics.")
     
-    # --- Case 2: Use Tab 2 optimal matches if they exist
+        best_client_df = optimal_df.copy()
+        best_client_df["match_score_pct"] = best_client_df["Final Score %"]
+    
+        st.success("✅ Using both Tab 1 (Matching Scores) and Tab 2 (Optimal Matches) for comparison.")
+    
+    # --- Case 2: Only Tab 1 available
+    elif "results_df" in locals() and "Final Score %" in results_df.columns:
+        df = results_df.copy()
+        df["match_score_pct"] = df["Final Score %"]
+        st.info(" Using only Tab 1 results (Tagged Matches).")
+    
+    # --- Case 3: Only Tab 2 available
     elif "optimal_df" in locals() and "Final Score %" in optimal_df.columns:
         best_client_df = optimal_df.copy()
         best_client_df["match_score_pct"] = best_client_df["Final Score %"]
-        st.success("Using Tab 2 Optimal Matches for summary metrics.")
+        st.info(" Using only Tab 2 results (Optimal Matches).")
     
-    # --- Case 3: If both exist, use both (best option)
-    if ("results_df" in locals() and "optimal_df" in locals() and
-        "Final Score %" in results_df.columns and "Final Score %" in optimal_df.columns):
-        df = results_df.copy()
-        df["match_score_pct"] = df["Final Score %"]
-        best_client_df = optimal_df.copy()
-        best_client_df["match_score_pct"] = best_client_df["Final Score %"]
-        st.success(" Using both Tab 1 and Tab 2 results for comparison.")
-    
-    # --- Case 4: Neither exists → show message only
-    if "match_score_pct" not in df.columns:
+    # --- Case 4: Neither dataset available
+    else:
         st.warning(
-            " 'Final Score %' column missing from dataset. "
+            " 'Final Score %' column missing or no datasets found. "
             "Run Tab 1 (Matching Scores) or Tab 2 (Optimal Matches) first to enable summary metrics."
         )
-
 
 
     # ---------------- Tab 5: Summary Metrics ----------------
