@@ -650,42 +650,26 @@ if uploaded_file:
                         "The uplift margin between current and optimal alignment — a direct measure of operational headroom."
                     )
     
-                # ---------------- Distribution ----------------
-                st.markdown("### Distribution of Match Scores")
-                import plotly.express as px, numpy as np
-    
-                # Ensure numeric just in case
-                df["match_score_pct"] = pd.to_numeric(df["match_score_pct"], errors="coerce")
-                best_client_df["match_score_pct"] = pd.to_numeric(best_client_df["match_score_pct"], errors="coerce")
-    
-                tagged_scores = df[["match_score_pct"]].assign(type="Tagged")
-                best_scores = best_client_df[["match_score_pct"]].assign(type="Best")
-                dist_data = pd.concat([tagged_scores, best_scores], ignore_index=True)
-    
-                # Diagnostic check (optional)
-                st.write("Value counts by group:", dist_data["type"].value_counts())
-    
-                bins = np.arange(0, 110, 10)
-                dist_data["bin"] = pd.cut(dist_data["match_score_pct"], bins=bins, right=False)
-                grouped = (
-                    dist_data.groupby(["bin", "type"]).size().reset_index(name="count")
-                )
-                grouped["percent"] = grouped.groupby("type")["count"].transform(lambda x: x / x.sum() * 100)
-                grouped["bin"] = grouped["bin"].astype(str)
-    
-                fig = px.bar(
-                    grouped,
-                    x="bin",
-                    y="percent",
-                    color="type",
-                    barmode="group",
-                    color_discrete_map={"Tagged": "#1f77b4", "Best": "#6baed6"},
-                    labels={"bin": "Match Score Range (%)", "percent": "Percentage of Clients", "type": "Group"},
-                    title="Score Distribution: Tagged vs. Best Matches"
-                )
-                st.plotly_chart(fig, use_container_width=True)
-    
+             
+                # ---------------- Summary Comparison ----------------
+                st.markdown("### Alignment Improvement Overview")
+                
+                # Calculate per-client improvement
+                merged = df.merge(best_client_df, on="client_name", suffixes=("_tagged", "_best"))
+                merged["delta"] = merged["match_score_pct_best"] - merged["match_score_pct_tagged"]
+                
+                improved = (merged["delta"] > 0).sum()
+                worsened = (merged["delta"] < 0).sum()
+                same = (merged["delta"] == 0).sum()
+                avg_gain = merged["delta"].mean()
+                
+                col1, col2, col3, col4 = st.columns(4)
+                col1.metric("Clients Improved", improved)
+                col2.metric("Unchanged", same)
+                col3.metric("Worsened", worsened)
+                col4.metric("Avg Gain", f"{avg_gain:+.2f}%")
+                
                 st.caption(
-                    "The shift in distribution from darker to lighter blue illustrates potential gains achievable "
-                    "through data-driven matching. More clients move from low-fit bands (<30%) into strong alignment zones."
+                    "This summary shows how many clients experienced a score improvement "
+                    "under algorithmic optimization. A consistent positive delta reflects stronger systemic alignment."
                 )
