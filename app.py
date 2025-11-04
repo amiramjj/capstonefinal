@@ -651,84 +651,65 @@ if uploaded_file:
                         "Across all placements, moree than 2,300 clients experienced improved match quality under algorithmic optimization."
                     )
     
-
             # -------------------------------
-            # Diagnostic Slice: Compare Tagged vs Best by Feature
+            # Client Drilldown: Tagged vs Best
             # -------------------------------
-            st.markdown("### 🔎 Diagnostic Slice: Compare Tagged vs Best by Feature")
+            st.markdown("### 👥 Client Drilldown: Tagged vs Best Match")
             
-            # Dynamically detect all client-level features
-            client_features = [c for c in df.columns if c.startswith("clientmts_")]
-            feature_choice = st.selectbox("Choose a client feature to slice by", client_features)
+            # Safety check
+            if df is None or best_client_df is None:
+                st.warning("⚠️ Run Tab 1 (Matching Scores) and Tab 2 (Optimal Matches) before viewing this section.")
+            else:
+                # Select a client name present in both datasets
+                common_clients = sorted(set(df["client_name"]).intersection(best_client_df["client_name"]))
+                if not common_clients:
+                    st.info("No overlapping clients found between Tagged and Best datasets.")
+                else:
+                    drill_client = st.selectbox("Choose a client to compare", common_clients)
             
-            if feature_choice:
-                # Prepare tagged (actual) scores
-                diag_df = pd.DataFrame({
-                    "feature": df[feature_choice],
-                    "tagged_score": df["Final Score %"],
-                    "client_name": df["client_name"]
-                })
+                    # Retrieve tagged and best rows
+                    tagged_row = df[df["client_name"] == drill_client].iloc[0]
+                    best_row = best_client_df[best_client_df["client_name"] == drill_client].iloc[0]
             
-                # Prepare best (optimal) scores
-                diag_best = best_client_df[["client_name", "Final Score %"]].merge(
-                    df[["client_name", feature_choice]],
-                    on="client_name",
-                    how="left"
-                )
-                diag_best.rename(columns={"Final Score %": "best_score"}, inplace=True)
+                    col1, col2 = st.columns(2)
             
-                # Aggregate mean scores per feature value
-                agg = (
-                    diag_df.groupby("feature")["tagged_score"].mean().reset_index()
-                    .merge(
-                        diag_best.groupby(feature_choice)["best_score"].mean().reset_index(),
-                        left_on="feature",
-                        right_on=feature_choice,
-                        how="outer"
+                    # --- Tagged Maid ---
+                    with col1:
+                        st.subheader("Tagged Maid (Current Placement)")
+                        st.write(f"**Maid:** {tagged_row['maid_id']}")
+                        st.write(f"**Match Score:** {tagged_row['Final Score %']:.1f}%")
+            
+                        st.markdown("**Reason Breakdown:**")
+                        st.write(f"- Household & Kids: {tagged_row['Household & Kids Reason']}")
+                        st.write(f"- Special Cases: {tagged_row['Special Cases Reason']}")
+                        st.write(f"- Pets: {tagged_row['Pets Reason']}")
+                        st.write(f"- Living: {tagged_row['Living Reason']}")
+                        st.write(f"- Nationality: {tagged_row['Nationality Reason']}")
+                        st.write(f"- Cuisine: {tagged_row['Cuisine Reason']}")
+                        st.write(f"- Bonus: {tagged_row['Bonus Reasons']}")
+            
+                    # --- Best Maid ---
+                    with col2:
+                        st.subheader("Best Maid (Algorithmic Match)")
+                        st.write(f"**Maid:** {best_row['maid_id']}")
+                        st.write(f"**Match Score:** {best_row['Final Score %']:.1f}%")
+            
+                        st.markdown("**Reason Breakdown:**")
+                        st.write(f"- Household & Kids: {best_row['Household & Kids Reason']}")
+                        st.write(f"- Special Cases: {best_row['Special Cases Reason']}")
+                        st.write(f"- Pets: {best_row['Pets Reason']}")
+                        st.write(f"- Living: {best_row['Living Reason']}")
+                        st.write(f"- Nationality: {best_row['Nationality Reason']}")
+                        st.write(f"- Cuisine: {best_row['Cuisine Reason']}")
+                        st.write(f"- Bonus: {best_row['Bonus Reasons']}")
+            
+                    # Caption for context
+                    st.caption(
+                        """
+                        This drilldown highlights the **efficiency gap at the client level**:
+                        - The **Tagged maid** shows the current placement (human-assigned or legacy).  
+                        - The **Best maid** represents the algorithmic optimum, often with higher alignment.  
+                        - By comparing both explanations side by side, you can quickly identify which mismatched themes
+                          (pets, living, or nationality) are dragging down current match quality.
+                        """
                     )
-                )
-                agg = agg.drop(columns=[feature_choice])
-            
-                # Reshape for plotting
-                agg_melted = agg.melt(
-                    id_vars="feature",
-                    value_vars=["tagged_score", "best_score"],
-                    var_name="type",
-                    value_name="avg_score"
-                )
-                agg_melted["type"] = agg_melted["type"].map({
-                    "tagged_score": "Tagged",
-                    "best_score": "Best"
-                })
-            
-                # --- Plot
-                fig3 = px.bar(
-                    agg_melted,
-                    x="feature",
-                    y="avg_score",
-                    color="type",
-                    barmode="group",
-                    color_discrete_map={
-                        "Tagged": "#1f77b4",
-                        "Best": "#6baed6"
-                    },
-                    category_orders={"type": ["Tagged", "Best"]},
-                    labels={
-                        "feature": feature_choice,
-                        "avg_score": "Average Match Score (%)",
-                        "type": "Group"
-                    },
-                    title=f"Average Match Scores by {feature_choice}"
-                )
-                fig3.update_yaxes(range=[0, 100])
-                st.plotly_chart(fig3, use_container_width=True)
-            
-                st.caption(
-                    f"""
-                    This diagnostic slice shows how **{feature_choice}** influences outcomes:
-                    - **Tagged assignments** represent current placement performance.  
-                    - **Best matches** reflect algorithmic optimization potential.  
-                    - When client preferences are *unspecified* or *generic*, scores typically drop — 
-                      reinforcing that **more detailed inputs produce higher-quality matches**.
-                    """
-                )
