@@ -312,19 +312,25 @@ def calculate_score(row):
     }
     s, r = score_cuisine(row["clientmts_cuisine_preference"], maid_flags)
     theme_scores["Cuisine Reason"] = r
-    if s is not None: scores.append(s); max_weights.append(THEME_WEIGHTS["cuisine"])
+    bonus, bonus_reasons = score_bonuses(row)
+    
     if not scores:
         return 0, "Neutral", theme_scores, []
+    
     base_score = sum(scores) / sum(max_weights) * 100
+    
     # Boost only if both caregiving and other themes match well
-    if row["clientmts_special_cases"] != "unspecified" and s is not None and base_score >= 85:
+    if (
+        row["clientmts_special_cases"] != "unspecified"
+        and s is not None
+        and base_score >= 85
+    ):
         final_score = 100
     else:
         final_score = min(base_score + bonus, 100)
-
-    bonus, bonus_reasons = score_bonuses(row)
-    final_score = min(base_score + bonus, 100)
+    
     return round(final_score, 1), theme_scores, bonus_reasons
+
 
 # -------------------------------
 # STREAMLIT APP
