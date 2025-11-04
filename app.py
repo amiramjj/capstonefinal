@@ -311,7 +311,7 @@ st.title("Client–Maid Matching Score Calculator")
 uploaded_file = st.file_uploader("Upload your dataset (CSV or Excel)", type=["csv", "xlsx"])
 if uploaded_file:
     df = pd.read_csv(uploaded_file) if uploaded_file.name.endswith(".csv") else pd.read_excel(uploaded_file)
-
+    master_df = df.copy()
     # Create tabs
     tab1, tab2, tab3, tab4, tab5 = st.tabs(["Matching Scores", "Optimal Matches","Customer Interface", "Maid Profile Explorer", "Summary Metrics"])
 
@@ -381,8 +381,10 @@ if uploaded_file:
         ]
         
         # Split into clients and maids
-        clients_df = df[client_cols].drop_duplicates(subset=["client_name"]).reset_index(drop=True)
-        maids_df = df[maid_cols].drop_duplicates(subset=["maid_id"]).reset_index(drop=True)
+        # clients_df = df[client_cols].drop_duplicates(subset=["client_name"]).reset_index(drop=True)
+        # maids_df = df[maid_cols].drop_duplicates(subset=["maid_id"]).reset_index(drop=True)
+        clients_df = master_df[client_cols].drop_duplicates(subset=["client_name"]).reset_index(drop=True)
+        maids_df = master_df[maid_cols].drop_duplicates(subset=["maid_id"]).reset_index(drop=True)
         
         st.write(f" Deduplication complete: {len(clients_df)} unique clients, {len(maids_df)} unique maids.")
     
