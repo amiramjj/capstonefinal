@@ -391,7 +391,9 @@ if uploaded_file:
         st.write("### Debug: Client and Maid special cases unique values")
         st.write("Client special cases:", master_df["clientmts_special_cases"].unique())
         st.write("Maid caregiving profile:", master_df["maidpref_caregiving_profile"].unique())
-        print(master_df["maidpref_caregiving_profile"].value_counts())
+        st.write("### Maid caregiving profile value counts")
+        st.write(master_df["maidpref_caregiving_profile"].value_counts())
+
 
                 # Preview clients_df
         st.write("### Clients (deduplicated)")
