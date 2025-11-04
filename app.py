@@ -388,15 +388,25 @@ if uploaded_file:
         maids_df = master_df[maid_cols].drop_duplicates(subset=["maid_id"]).reset_index(drop=True)
         
         st.write(f" Deduplication complete: {len(clients_df)} unique clients, {len(maids_df)} unique maids.")
-        # 👀 Check unique values for debugging
-        st.write("### Debug: Client and Maid special cases unique values")
-        st.write("Client special cases:", master_df["clientmts_special_cases"].unique())
-        st.write("Maid caregiving profile:", master_df["maidpref_caregiving_profile"].unique())
-        st.write("### Maid caregiving profile value counts")
-        st.write(master_df["maidpref_caregiving_profile"].value_counts())
 
+        # -------------------------------
+        # Download buttons for deduplicated data
+        # -------------------------------
+        st.download_button(
+            label="Download Deduplicated Clients CSV",
+            data=clients_df.to_csv(index=False).encode("utf-8"),
+            file_name="deduplicated_clients.csv",
+            mime="text/csv"
+        )
+        
+        st.download_button(
+            label="Download Deduplicated Maids CSV",
+            data=maids_df.to_csv(index=False).encode("utf-8"),
+            file_name="deduplicated_maids.csv",
+            mime="text/csv"
+        )
 
-                # Preview clients_df
+        # Preview clients_df
         st.write("### Clients (deduplicated)")
         st.dataframe(clients_df.head(20))   # show first 20 rows
         st.write("Client columns:", clients_df.columns.tolist())
