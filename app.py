@@ -566,16 +566,24 @@ if uploaded_file:
     # --------------------------------------------
     # Bridge: Prepare data for Summary Metrics tab
     # --------------------------------------------
+    
+    # Load from session_state (set in Tab 1 & Tab 2)
+    results_df = st.session_state.get("results_df")
+    optimal_df = st.session_state.get("optimal_df")
+    
     df, best_client_df = None, None
     
-    if "results_df" in st.session_state and "Final Score %" in st.session_state["results_df"].columns:
-        df = st.session_state["results_df"].copy()
-        df["match_score_pct"] = df["Final Score %"]
+    # Tab 1 (Matching Scores)
+    if results_df is not None and "Final Score %" in results_df.columns:
+        df = results_df.copy()
+        df["match_score_pct"] = df["Final Score %"]  # temporary alias only
     
-    if "optimal_df" in st.session_state and "Final Score %" in st.session_state["optimal_df"].columns:
-        best_client_df = st.session_state["optimal_df"].copy()
-        best_client_df["match_score_pct"] = best_client_df["Final Score %"]
+    # Tab 2 (Optimal Matches)
+    if optimal_df is not None and "Final Score %" in optimal_df.columns:
+        best_client_df = optimal_df.copy()
+        best_client_df["match_score_pct"] = best_client_df["Final Score %"]  # temporary alias only
     
+    # User feedback
     if df is not None and best_client_df is not None:
         st.success("✅ Using both Tab 1 (Matching Scores) and Tab 2 (Optimal Matches) for comparison.")
     elif df is not None:
@@ -584,6 +592,7 @@ if uploaded_file:
         st.info("ℹ️ Using only Tab 2 (Optimal Matches).")
     else:
         st.warning("⚠️ Run Tab 1 or Tab 2 before viewing Summary Metrics.")
+
 
     # ---------------- Tab 5: Summary Metrics ----------------
     with tab5:
