@@ -533,13 +533,6 @@ if uploaded_file:
             maid_cols + ["maid_speaks_language"]
         )
     
-        # 🔘 View mode toggle
-        view_mode = st.radio(
-            "Select display mode:",
-            ["Compact View (2 columns)", "Detailed View (list)"],
-            horizontal=True
-        )
-    
         if feature_choice == "maid_speaks_language":
             # Handle language grouping separately
             for lang_col in lang_cols:
@@ -551,20 +544,12 @@ if uploaded_file:
                         if st.button(f"Maid {mid}", key=f"maid_lang_{lang_name}_{mid}"):
                             maid_row = maids_df[maids_df["maid_id"] == mid].iloc[0]
                             st.markdown(f"### Maid {maid_row['maid_id']}")
-                            
-                            if view_mode == "Detailed View (list)":
-                                for col in maid_cols + lang_cols:
-                                    value = maid_row[col]
-                                    st.markdown(f"**{col.replace('_', ' ').capitalize()}:** {value}")
-                            else:
-                                cols = st.columns(2)
-                                for i, col in enumerate(maid_cols + lang_cols):
-                                    value = maid_row[col]
-                                    with cols[i % 2]:
-                                        st.markdown(f"**{col.replace('_', ' ').capitalize()}:** {value}")
+                            for col in maid_cols + lang_cols:
+                                value = maid_row[col]
+                                st.markdown(f"**{col.replace('_', ' ').capitalize()}:** {value}")
     
         else:
-            # Normal grouping for other features
+            # Normal grouping for all other features
             grouped = maids_df.groupby(feature_choice)["maid_id"].apply(list).reset_index()
     
             for _, row in grouped.iterrows():
@@ -573,42 +558,42 @@ if uploaded_file:
                         if st.button(f"Maid {mid}", key=f"maid_{feature_choice}_{mid}"):
                             maid_row = maids_df[maids_df["maid_id"] == mid].iloc[0]
                             st.markdown(f"### Maid {maid_row['maid_id']}")
-                            
-                            if view_mode == "Detailed View (list)":
-                                for col in maid_cols + lang_cols:
-                                    value = maid_row[col]
-                                    st.markdown(f"**{col.replace('_', ' ').capitalize()}:** {value}")
-                            else:
-                                cols = st.columns(2)
-                                for i, col in enumerate(maid_cols + lang_cols):
-                                    value = maid_row[col]
-                                    with cols[i % 2]:
-                                        st.markdown(f"**{col.replace('_', ' ').capitalize()}:** {value}")
+                            for col in maid_cols + lang_cols:
+                                value = maid_row[col]
+                                st.markdown(f"**{col.replace('_', ' ').capitalize()}:** {value}")
 
 
     # --------------------------------------------
-    # Bridge setup before Summary Metrics (Tab 5)
+    # Bridge: Prepare data for Summary Metrics tab
     # --------------------------------------------
     
-    # Ensure best-client matches are accessible
-    if "optimal_df" in locals():
-        best_client_df = optimal_df.copy()
-    else:
-        st.warning(" Optimal matches not found — please compute them in Tab 2 first.")
-        best_client_df = pd.DataFrame()
-    
-    # Ensure consistent match-score field names
-    if "Final Score %" in df.columns:
+    # --- Case 1: Use Tab 1 results if they exist
+    if "results_df" in locals() and "Final Score %" in results_df.columns:
+        df = results_df.copy()
         df["match_score_pct"] = df["Final Score %"]
-    elif "match_score_pct" not in df.columns:
-        st.warning(" 'Final Score %' column missing from dataset. Summary metrics may not compute correctly.")
-        df["match_score_pct"] = 0
+        st.success("Using Tab 1 Matching Scores for summary metrics.")
     
-    if not best_client_df.empty:
-        if "Final Score %" in best_client_df.columns:
-            best_client_df["match_score_pct"] = best_client_df["Final Score %"]
-        elif "match_score_pct" not in best_client_df.columns:
-            best_client_df["match_score_pct"] = 0
+    # --- Case 2: Use Tab 2 optimal matches if they exist
+    elif "optimal_df" in locals() and "Final Score %" in optimal_df.columns:
+        best_client_df = optimal_df.copy()
+        best_client_df["match_score_pct"] = best_client_df["Final Score %"]
+        st.success("Using Tab 2 Optimal Matches for summary metrics.")
+    
+    # --- Case 3: If both exist, use both (best option)
+    if ("results_df" in locals() and "optimal_df" in locals() and
+        "Final Score %" in results_df.columns and "Final Score %" in optimal_df.columns):
+        df = results_df.copy()
+        df["match_score_pct"] = df["Final Score %"]
+        best_client_df = optimal_df.copy()
+        best_client_df["match_score_pct"] = best_client_df["Final Score %"]
+        st.success(" Using both Tab 1 and Tab 2 results for comparison.")
+    
+    # --- Case 4: Neither exists → show message only
+    if "match_score_pct" not in df.columns:
+        st.warning(
+            " 'Final Score %' column missing from dataset. "
+            "Run Tab 1 (Matching Scores) or Tab 2 (Optimal Matches) first to enable summary metrics."
+        )
 
 
 
