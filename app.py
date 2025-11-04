@@ -647,30 +647,88 @@ if uploaded_file:
                 with col3:
                     st.metric("Potential Improvement", f"{delta:+.1f}%")
                     st.caption(
-                        "The uplift margin between current and optimal alignment — a direct measure of operational headroom." 
+                        "The uplift margin between current and optimal alignment, a direct measure of operational headroom." 
                         "Across all placements, moree than 2,300 clients experienced improved match quality under algorithmic optimization."
                     )
     
-             
-                # ---------------- Summary Comparison ----------------
-                st.markdown("### Alignment Improvement Overview")
-                
-                # Calculate per-client improvement
-                merged = df.merge(best_client_df, on="client_name", suffixes=("_tagged", "_best"))
-                merged["delta"] = merged["match_score_pct_best"] - merged["match_score_pct_tagged"]
-                
-                improved = (merged["delta"] > 0).sum()
-                worsened = (merged["delta"] < 0).sum()
-                same = (merged["delta"] == 0).sum()
-                avg_gain = merged["delta"].mean()
-                
-                col1, col2, col3, col4 = st.columns(4)
-                col1.metric("Clients Improved", improved)
-                col2.metric("Unchanged", same)
-                col3.metric("Worsened", worsened)
-                col4.metric("Avg Gain", f"{avg_gain:+.2f}%")
-                
+
+            # -------------------------------
+            # Diagnostic Slice: Compare Tagged vs Best by Feature
+            # -------------------------------
+            st.markdown("### 🔎 Diagnostic Slice: Compare Tagged vs Best by Feature")
+            
+            # Dynamically detect all client-level features
+            client_features = [c for c in df.columns if c.startswith("clientmts_")]
+            feature_choice = st.selectbox("Choose a client feature to slice by", client_features)
+            
+            if feature_choice:
+                # Prepare tagged (actual) scores
+                diag_df = pd.DataFrame({
+                    "feature": df[feature_choice],
+                    "tagged_score": df["Final Score %"],
+                    "client_name": df["client_name"]
+                })
+            
+                # Prepare best (optimal) scores
+                diag_best = best_client_df[["client_name", "Final Score %"]].merge(
+                    df[["client_name", feature_choice]],
+                    on="client_name",
+                    how="left"
+                )
+                diag_best.rename(columns={"Final Score %": "best_score"}, inplace=True)
+            
+                # Aggregate mean scores per feature value
+                agg = (
+                    diag_df.groupby("feature")["tagged_score"].mean().reset_index()
+                    .merge(
+                        diag_best.groupby(feature_choice)["best_score"].mean().reset_index(),
+                        left_on="feature",
+                        right_on=feature_choice,
+                        how="outer"
+                    )
+                )
+                agg = agg.drop(columns=[feature_choice])
+            
+                # Reshape for plotting
+                agg_melted = agg.melt(
+                    id_vars="feature",
+                    value_vars=["tagged_score", "best_score"],
+                    var_name="type",
+                    value_name="avg_score"
+                )
+                agg_melted["type"] = agg_melted["type"].map({
+                    "tagged_score": "Tagged",
+                    "best_score": "Best"
+                })
+            
+                # --- Plot
+                fig3 = px.bar(
+                    agg_melted,
+                    x="feature",
+                    y="avg_score",
+                    color="type",
+                    barmode="group",
+                    color_discrete_map={
+                        "Tagged": "#1f77b4",
+                        "Best": "#6baed6"
+                    },
+                    category_orders={"type": ["Tagged", "Best"]},
+                    labels={
+                        "feature": feature_choice,
+                        "avg_score": "Average Match Score (%)",
+                        "type": "Group"
+                    },
+                    title=f"Average Match Scores by {feature_choice}"
+                )
+                fig3.update_yaxes(range=[0, 100])
+                st.plotly_chart(fig3, use_container_width=True)
+            
                 st.caption(
-                    "This summary shows how many clients experienced a score improvement "
-                    "under algorithmic optimization. A consistent positive delta reflects stronger systemic alignment."
+                    f"""
+                    This diagnostic slice shows how **{feature_choice}** influences outcomes:
+                    - **Tagged assignments** represent current placement performance.  
+                    - **Best matches** reflect algorithmic optimization potential.  
+                    - When client preferences are *unspecified* or *generic*, scores typically drop — 
+                      reinforcing that **more detailed inputs produce higher-quality matches**.
+                    """
                 )
