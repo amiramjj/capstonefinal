@@ -575,23 +575,17 @@ if uploaded_file:
     # --------------------------------------------
     # Bridge: Prepare data for Summary Metrics tab
     # --------------------------------------------
-    
-    results_df = st.session_state.get("results_df")
-    optimal_df = st.session_state.get("optimal_df")
-    
     df, best_client_df = None, None
     
-    # Tab 1
-    if results_df is not None and "Final Score %" in results_df.columns:
+    # Use Tab 1 (Matching Scores)
+    if "results_df" in locals() and "Final Score %" in results_df.columns:
         df = results_df.copy()
-        df["match_score_pct"] = df["Final Score %"]  # temporary alias only
     
-    # Tab 2
-    if optimal_df is not None and "Final Score %" in optimal_df.columns:
+    # Use Tab 2 (Optimal Matches)
+    if "optimal_df" in locals() and "Final Score %" in optimal_df.columns:
         best_client_df = optimal_df.copy()
-        best_client_df["match_score_pct"] = best_client_df["Final Score %"]
     
-    # Status message
+    # Notify what’s available
     if df is not None and best_client_df is not None:
         st.success("✅ Using both Tab 1 (Matching Scores) and Tab 2 (Optimal Matches) for comparison.")
     elif df is not None:
@@ -600,64 +594,38 @@ if uploaded_file:
         st.info("ℹ️ Using only Tab 2 (Optimal Matches).")
     else:
         st.warning("⚠️ Run Tab 1 or Tab 2 before viewing Summary Metrics.")
-    
 
 
     # ---------------- Tab 5: Summary Metrics ----------------
     with tab5:
         st.subheader("Summary Metrics")
-
-            # --- Safety: ensure required columns exist
+    
         if df is None or best_client_df is None:
             st.warning("⚠️ Run Tab 1 and Tab 2 before viewing Summary Metrics.")
         else:
-            # 👉 Add this debug line here
-            st.write(f"Tagged: {len(df) if df is not None else 0}, Best: {len(best_client_df) if best_client_df is not None else 0}")
+            st.write(f"Tagged: {len(df)}, Best: {len(best_client_df)}")
     
-        
-        # --- Safety: ensure required columns exist
-        if "match_score_pct" not in df.columns or "match_score_pct" not in best_client_df.columns:
-            st.error("Required column 'match_score_pct' not found. Please compute match scores first.")
-        else:
-            # ---------------- Averages ----------------
-            avg_tagged = df["match_score_pct"].mean()
-            avg_best = best_client_df["match_score_pct"].mean()
+            # Averages
+            avg_tagged = df["Final Score %"].mean()
+            avg_best = best_client_df["Final Score %"].mean()
             delta = avg_best - avg_tagged
     
             col1, col2, col3 = st.columns(3)
-            with col1:
-                st.metric("Avg Tagged Match Score", f"{avg_tagged:.1f}%")
-                st.caption(
-                    "Represents current placement quality across tagged assignments. "
-                    "Lower averages indicate suboptimal client–maid pairings."
-                )
+            col1.metric("Avg Tagged Match Score", f"{avg_tagged:.1f}%")
+            col2.metric("Avg Best Match Score", f"{avg_best:.1f}%")
+            col3.metric("Potential Improvement", f"{delta:+.1f}%")
     
-            with col2:
-                st.metric("Avg Best Match Score", f"{avg_best:.1f}%")
-                st.caption(
-                    "Shows the achievable average if each client were paired with their highest-fit maid "
-                    "based on the algorithmic matching logic."
-                )
-    
-            with col3:
-                st.metric("Potential Improvement", f"{delta:+.1f}%")
-                st.caption(
-                    "The uplift margin between current and optimal alignment — a direct measure of operational headroom."
-                )
-    
-            # ---------------- Distribution ----------------
-            st.markdown("### Distribution of Match Scores")
+            # Distribution
             import plotly.express as px, numpy as np
+            st.markdown("### Distribution of Match Scores")
     
-            tagged_scores = df[["match_score_pct"]].assign(type="Tagged")
-            best_scores = best_client_df[["match_score_pct"]].assign(type="Best")
+            tagged_scores = df[["Final Score %"]].assign(type="Tagged")
+            best_scores = best_client_df[["Final Score %"]].assign(type="Best")
             dist_data = pd.concat([tagged_scores, best_scores], ignore_index=True)
     
             bins = np.arange(0, 110, 10)
-            dist_data["bin"] = pd.cut(dist_data["match_score_pct"], bins=bins, right=False)
-            grouped = (
-                dist_data.groupby(["bin", "type"]).size().reset_index(name="count")
-            )
+            dist_data["bin"] = pd.cut(dist_data["Final Score %"], bins=bins, right=False)
+            grouped = dist_data.groupby(["bin", "type"]).size().reset_index(name="count")
             grouped["percent"] = grouped.groupby("type")["count"].transform(lambda x: x / x.sum() * 100)
             grouped["bin"] = grouped["bin"].astype(str)
     
@@ -674,8 +642,5 @@ if uploaded_file:
             st.plotly_chart(fig, use_container_width=True)
     
             st.caption(
-                "The shift in distribution from darker to lighter blue illustrates potential gains achievable "
-                "through data-driven matching. More clients move from low-fit bands (<30%) into strong alignment zones."
+                "The shift from darker to lighter blue shows potential improvement achievable through algorithmic matching."
             )
-    
-    
