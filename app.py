@@ -566,43 +566,27 @@ if uploaded_file:
     # --------------------------------------------
     # Bridge: Prepare data for Summary Metrics tab
     # --------------------------------------------
-    
-    # Initialize to avoid reference errors
     df, best_client_df = None, None
     
-    # --- Case 1: Both datasets available
-    if (
-        "results_df" in locals() and "optimal_df" in locals()
-        and "Final Score %" in results_df.columns
-        and "Final Score %" in optimal_df.columns
-    ):
+    # Load Tagged results (Tab 1)
+    if "results_df" in locals() and "Final Score %" in results_df.columns:
         df = results_df.copy()
         df["match_score_pct"] = df["Final Score %"]
     
+    # Load Optimal matches (Tab 2)
+    if "optimal_df" in locals() and "Final Score %" in optimal_df.columns:
         best_client_df = optimal_df.copy()
         best_client_df["match_score_pct"] = best_client_df["Final Score %"]
     
+    # Check both
+    if df is not None and best_client_df is not None:
         st.success("✅ Using both Tab 1 (Matching Scores) and Tab 2 (Optimal Matches) for comparison.")
-    
-    # --- Case 2: Only Tab 1 available
-    elif "results_df" in locals() and "Final Score %" in results_df.columns:
-        df = results_df.copy()
-        df["match_score_pct"] = df["Final Score %"]
-        st.info(" Using only Tab 1 results (Tagged Matches).")
-    
-    # --- Case 3: Only Tab 2 available
-    elif "optimal_df" in locals() and "Final Score %" in optimal_df.columns:
-        best_client_df = optimal_df.copy()
-        best_client_df["match_score_pct"] = best_client_df["Final Score %"]
-        st.info(" Using only Tab 2 results (Optimal Matches).")
-    
-    # --- Case 4: Neither dataset available
+    elif df is not None:
+        st.info("ℹ️ Using only Tab 1 (Matching Scores).")
+    elif best_client_df is not None:
+        st.info("ℹ️ Using only Tab 2 (Optimal Matches).")
     else:
-        st.warning(
-            " 'Final Score %' column missing or no datasets found. "
-            "Run Tab 1 (Matching Scores) or Tab 2 (Optimal Matches) first to enable summary metrics."
-        )
-
+        st.warning("⚠️ Run Tab 1 or Tab 2 before viewing Summary Metrics.")
 
     # ---------------- Tab 5: Summary Metrics ----------------
     with tab5:
