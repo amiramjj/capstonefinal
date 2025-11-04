@@ -606,7 +606,15 @@ if uploaded_file:
     # ---------------- Tab 5: Summary Metrics ----------------
     with tab5:
         st.subheader("Summary Metrics")
+
+            # --- Safety: ensure required columns exist
+        if df is None or best_client_df is None:
+            st.warning("⚠️ Run Tab 1 and Tab 2 before viewing Summary Metrics.")
+        else:
+            # 👉 Add this debug line here
+            st.write(f"Tagged: {len(df) if df is not None else 0}, Best: {len(best_client_df) if best_client_df is not None else 0}")
     
+        
         # --- Safety: ensure required columns exist
         if "match_score_pct" not in df.columns or "match_score_pct" not in best_client_df.columns:
             st.error("Required column 'match_score_pct' not found. Please compute match scores first.")
