@@ -26,36 +26,54 @@ BONUS_CAP = 10  # max total bonus %
 
 def score_household_kids(client, maid, exp):
     w = THEME_WEIGHTS["household_kids"]
+
+    # Case 1: Client unspecified → Neutral
     if client == "unspecified":
         return None, "Neutral: client did not specify household type"
+
+    # Define experience set for readability
+    has_exp = exp in ["lessthan2", "above2", "both"]
+
+    # Case 2: Client = baby
     if client == "baby":
         if maid in ["refuses_baby", "refuses_baby_and_kids"]:
-            if exp in ["lessthan2", "above2", "both"]:
-                return int(w * 1.2), "Bonus: maid has kids experience despite refusal (baby)"
+            if has_exp:
+                return 8, "Partial: maid has childcare experience despite refusal (baby)"
             return 0, "Mismatch: maid refuses baby care"
-        elif exp in ["lessthan2", "above2", "both"]:
-            return int(w * 1.2), "Bonus: maid has kids experience, client has baby"
+        elif has_exp:
+            return 10, "Perfect match: maid accepts and has childcare experience (baby)"
         else:
-            return w, "Match: client has baby, maid accepts"
+            return 9, "Standard match: maid accepts baby care without experience"
+
+    # Case 3: Client = many kids
     if client == "many_kids":
         if maid in ["refuses_many_kids", "refuses_baby_and_kids"]:
-            if exp in ["lessthan2", "above2", "both"]:
-                return int(w * 1.2), "Bonus: maid has kids experience despite refusal (many kids)"
+            if has_exp:
+                return 8, "Partial: maid has childcare experience despite refusal (many kids)"
             return 0, "Mismatch: maid refuses many kids"
-        elif exp in ["lessthan2", "above2", "both"]:
-            return int(w * 1.2), "Bonus: maid has kids experience, client has many kids"
+        elif has_exp:
+            return 10, "Perfect match: maid accepts and has childcare experience (many kids)"
         else:
-            return w, "Match: client has many kids, maid accepts"
+            return 9, "Standard match: maid accepts many kids without experience"
+
+    # Case 4: Client = baby and kids
     if client == "baby_and_kids":
         if maid in ["refuses_baby_and_kids", "refuses_baby", "refuses_many_kids"]:
-            if exp in ["lessthan2", "above2", "both"]:
-                return int(w * 1.2), "Bonus: maid has kids experience despite refusal (baby_and_kids)"
+            if has_exp:
+                return 8, "Partial: maid has childcare experience despite refusal (baby_and_kids)"
             return 0, "Mismatch: maid refuses baby_and_kids"
-        elif exp in ["lessthan2", "above2", "both"]:
-            return int(w * 1.2), "Bonus: maid has kids experience, client has baby_and_kids"
+        elif has_exp:
+            return 10, "Perfect match: maid accepts and has childcare experience (baby_and_kids)"
         else:
-            return w, "Match: client has baby_and_kids, maid accepts"
+            return 9, "Standard match: maid accepts baby_and_kids without experience"
+
+    # Case 5: Experience only (no clear acceptance or refusal)
+    if has_exp:
+        return 8, "Partial: maid has childcare experience only (no stated preference)"
+
+    # Case 6: Default
     return None, "Neutral"
+
 
 def score_special_cases(client, maid):
     w = THEME_WEIGHTS["special_cases"]
@@ -113,21 +131,41 @@ def score_pets(client, maid, handling):
 
 def score_living(client, maid):
     w = THEME_WEIGHTS["living"]
+
+    # Case 1: Both sides unspecified or unrestricted → Match
+    if client == "unspecified" and maid == "no_restriction_living_arrangement":
+        return w, "Match: both sides unrestricted, flexible and compatible"
+
+    # Case 2: Client unspecified → Neutral
     if client == "unspecified":
         return None, "Neutral: client did not specify living arrangement"
 
-    # Client requires private room
+    # Case 3: Maid requires private room but client doesn't provide one → Mismatch
+    if "requires_private_room" in maid and "private_room" not in client:
+        return 0, "Mismatch: maid requires private room but client did not offer one"
+
+    # Case 4: Maid refuses Abu Dhabi but client does not mention Abu Dhabi → Match (irrelevant refusal)
+    if "refuses_abu_dhabi" in maid and "abu_dhabi" not in client:
+        return w, "Match: maid refuses Abu Dhabi and client not in Abu Dhabi"
+
+    # Case 5: Client and maid both require private room → Perfect match
+    if client in ["private_room", "live_out+private_room"] and "requires_private_room" in maid:
+        return w, "Match: both client and maid require private room"
+    
+    # Case 6: Client requires private room (maid doesn’t specifically require it) → Standard match
     if client in ["private_room", "live_out+private_room"]:
         return w, "Match: private room requirement satisfied"
 
-    # Client requires Abu Dhabi posting
+    # Case 7: Client requires Abu Dhabi posting → check maid’s refusal
     if client in ["private_room+abu_dhabi", "live_out+private_room+abu_dhabi"]:
         if "refuses_abu_dhabi" in maid:
             return 0, "Mismatch: maid refuses Abu Dhabi"
         else:
             return w, "Match: Abu Dhabi posting acceptable"
 
+    # Case 8: Default → Neutral
     return None, "Neutral"
+
 
 def score_nationality(client, maid):
     w = THEME_WEIGHTS["nationality"]
@@ -275,7 +313,7 @@ if uploaded_file:
     df = pd.read_csv(uploaded_file) if uploaded_file.name.endswith(".csv") else pd.read_excel(uploaded_file)
 
     # Create tabs
-    tab1, tab2, tab3 = st.tabs(["Matching Scores", "Optimal Matches","Customer Interface"])
+    tab1, tab2, tab3 = st.tabs(["Matching Scores", "Optimal Matches","Customer Interface", "Maid Profile Explorer", "Summary Metrics"])
 
     # ---------------- Tab 1: Existing Matching ----------------
     with tab1:
@@ -468,3 +506,177 @@ if uploaded_file:
                     st.write("**Nationality:**", match["Nationality Reason"])
                     st.write("**Cuisine:**", match["Cuisine Reason"])
                     st.write("**Bonus:**", match["Bonus Reasons"])
+
+    # ---------------- Tab 4: Maid Profile Explorer ----------------
+    with tab4:
+        st.subheader("Maid Profile Explorer")
+    
+        # Deduplicate by maid_id
+        maids_df = df.drop_duplicates(subset=["maid_id"]).copy()
+        maids_df = maids_df.loc[:, ~maids_df.columns.duplicated()]
+    
+        # Detect maid-related columns (exclude irrelevant ones)
+        maid_cols = [
+            c for c in maids_df.columns
+            if (c.startswith("maidmts_") or c.startswith("maidpref_") or c.startswith("maid_"))
+            and c != "maidmts_at_hiring"
+        ]
+    
+        # Detect language-related columns
+        lang_cols = [c for c in maids_df.columns if c.startswith("maidspeaks_")]
+    
+        # Group explorer
+        st.markdown("### Group Maids by Feature")
+    
+        feature_choice = st.selectbox(
+            "Choose a feature to group by",
+            maid_cols + ["maid_speaks_language"]
+        )
+    
+        # 🔘 View mode toggle
+        view_mode = st.radio(
+            "Select display mode:",
+            ["Compact View (2 columns)", "Detailed View (list)"],
+            horizontal=True
+        )
+    
+        if feature_choice == "maid_speaks_language":
+            # Handle language grouping separately
+            for lang_col in lang_cols:
+                lang_name = lang_col.replace("maidspeaks_", "").capitalize()
+                maid_ids = maids_df.loc[maids_df[lang_col] == 1, "maid_id"].tolist()
+    
+                with st.expander(f"maid_speaks_language: {lang_name}"):
+                    for mid in sorted(maid_ids):
+                        if st.button(f"Maid {mid}", key=f"maid_lang_{lang_name}_{mid}"):
+                            maid_row = maids_df[maids_df["maid_id"] == mid].iloc[0]
+                            st.markdown(f"### Maid {maid_row['maid_id']}")
+                            
+                            if view_mode == "Detailed View (list)":
+                                for col in maid_cols + lang_cols:
+                                    value = maid_row[col]
+                                    st.markdown(f"**{col.replace('_', ' ').capitalize()}:** {value}")
+                            else:
+                                cols = st.columns(2)
+                                for i, col in enumerate(maid_cols + lang_cols):
+                                    value = maid_row[col]
+                                    with cols[i % 2]:
+                                        st.markdown(f"**{col.replace('_', ' ').capitalize()}:** {value}")
+    
+        else:
+            # Normal grouping for other features
+            grouped = maids_df.groupby(feature_choice)["maid_id"].apply(list).reset_index()
+    
+            for _, row in grouped.iterrows():
+                with st.expander(f"{feature_choice}: {row[feature_choice]}"):
+                    for mid in sorted(row["maid_id"]):
+                        if st.button(f"Maid {mid}", key=f"maid_{feature_choice}_{mid}"):
+                            maid_row = maids_df[maids_df["maid_id"] == mid].iloc[0]
+                            st.markdown(f"### Maid {maid_row['maid_id']}")
+                            
+                            if view_mode == "Detailed View (list)":
+                                for col in maid_cols + lang_cols:
+                                    value = maid_row[col]
+                                    st.markdown(f"**{col.replace('_', ' ').capitalize()}:** {value}")
+                            else:
+                                cols = st.columns(2)
+                                for i, col in enumerate(maid_cols + lang_cols):
+                                    value = maid_row[col]
+                                    with cols[i % 2]:
+                                        st.markdown(f"**{col.replace('_', ' ').capitalize()}:** {value}")
+
+
+    # --------------------------------------------
+    # Bridge setup before Summary Metrics (Tab 5)
+    # --------------------------------------------
+    
+    # Ensure best-client matches are accessible
+    if "optimal_df" in locals():
+        best_client_df = optimal_df.copy()
+    else:
+        st.warning(" Optimal matches not found — please compute them in Tab 2 first.")
+        best_client_df = pd.DataFrame()
+    
+    # Ensure consistent match-score field names
+    if "Final Score %" in df.columns:
+        df["match_score_pct"] = df["Final Score %"]
+    elif "match_score_pct" not in df.columns:
+        st.warning(" 'Final Score %' column missing from dataset. Summary metrics may not compute correctly.")
+        df["match_score_pct"] = 0
+    
+    if not best_client_df.empty:
+        if "Final Score %" in best_client_df.columns:
+            best_client_df["match_score_pct"] = best_client_df["Final Score %"]
+        elif "match_score_pct" not in best_client_df.columns:
+            best_client_df["match_score_pct"] = 0
+
+
+
+    # ---------------- Tab 5: Summary Metrics ----------------
+    with tab5:
+        st.subheader("Summary Metrics")
+    
+        # --- Safety: ensure required columns exist
+        if "match_score_pct" not in df.columns or "match_score_pct" not in best_client_df.columns:
+            st.error("Required column 'match_score_pct' not found. Please compute match scores first.")
+        else:
+            # ---------------- Averages ----------------
+            avg_tagged = df["match_score_pct"].mean()
+            avg_best = best_client_df["match_score_pct"].mean()
+            delta = avg_best - avg_tagged
+    
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Avg Tagged Match Score", f"{avg_tagged:.1f}%")
+                st.caption(
+                    "Represents current placement quality across tagged assignments. "
+                    "Lower averages indicate suboptimal client–maid pairings."
+                )
+    
+            with col2:
+                st.metric("Avg Best Match Score", f"{avg_best:.1f}%")
+                st.caption(
+                    "Shows the achievable average if each client were paired with their highest-fit maid "
+                    "based on the algorithmic matching logic."
+                )
+    
+            with col3:
+                st.metric("Potential Improvement", f"{delta:+.1f}%")
+                st.caption(
+                    "The uplift margin between current and optimal alignment — a direct measure of operational headroom."
+                )
+    
+            # ---------------- Distribution ----------------
+            st.markdown("### Distribution of Match Scores")
+            import plotly.express as px, numpy as np
+    
+            tagged_scores = df[["match_score_pct"]].assign(type="Tagged")
+            best_scores = best_client_df[["match_score_pct"]].assign(type="Best")
+            dist_data = pd.concat([tagged_scores, best_scores], ignore_index=True)
+    
+            bins = np.arange(0, 110, 10)
+            dist_data["bin"] = pd.cut(dist_data["match_score_pct"], bins=bins, right=False)
+            grouped = (
+                dist_data.groupby(["bin", "type"]).size().reset_index(name="count")
+            )
+            grouped["percent"] = grouped.groupby("type")["count"].transform(lambda x: x / x.sum() * 100)
+            grouped["bin"] = grouped["bin"].astype(str)
+    
+            fig = px.bar(
+                grouped,
+                x="bin",
+                y="percent",
+                color="type",
+                barmode="group",
+                color_discrete_map={"Tagged": "#1f77b4", "Best": "#6baed6"},
+                labels={"bin": "Match Score Range (%)", "percent": "Percentage of Clients", "type": "Group"},
+                title="Score Distribution: Tagged vs. Best Matches"
+            )
+            st.plotly_chart(fig, use_container_width=True)
+    
+            st.caption(
+                "The shift in distribution from darker to lighter blue illustrates potential gains achievable "
+                "through data-driven matching. More clients move from low-fit bands (<30%) into strong alignment zones."
+            )
+    
+    
