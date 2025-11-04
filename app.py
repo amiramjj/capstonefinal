@@ -313,7 +313,7 @@ if uploaded_file:
     df = pd.read_csv(uploaded_file) if uploaded_file.name.endswith(".csv") else pd.read_excel(uploaded_file)
 
     # Create tabs
-    tab1, tab2, tab3 = st.tabs(["Matching Scores", "Optimal Matches","Customer Interface", "Maid Profile Explorer", "Summary Metrics"])
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(["Matching Scores", "Optimal Matches","Customer Interface", "Maid Profile Explorer", "Summary Metrics"])
 
     # ---------------- Tab 1: Existing Matching ----------------
     with tab1:
