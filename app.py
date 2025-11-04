@@ -74,27 +74,44 @@ def score_household_kids(client, maid, exp):
     # Case 6: Default
     return None, "Neutral"
 
-
 def score_special_cases(client, maid):
     w = THEME_WEIGHTS["special_cases"]
+
+    client = str(client).strip().lower().replace(" ", "_")
+    maid   = str(maid).strip().lower().replace(" ", "_")
+
+    # Client unspecified → neutral
     if client == "unspecified":
         return None, "Neutral: client did not specify special cases"
+
+    # --- Matching logic ---
     if client == "elderly":
         if maid in ["elderly_experienced", "elderly_and_special"]:
             return w, "Match: elderly supported"
         elif maid == "special_needs":
-            return int(w * 0.6), "Partial: client elderly, maid only has special_needs"
+            return int(w * 0.6), "Partial overlap: maid special_needs skilled"
+        else:
+            return 0, "Mismatch: maid unqualified for elderly care"
+
     if client == "special_needs":
         if maid in ["special_needs", "elderly_and_special"]:
             return w, "Match: special needs supported"
         elif maid == "elderly_experienced":
-            return int(w * 0.6), "Partial: client special_needs, maid only elderly"
+            return int(w * 0.6), "Partial overlap: maid elderly-experienced"
+        else:
+            return 0, "Mismatch: maid unqualified for special needs care"
+
     if client == "elderly_and_special":
         if maid == "elderly_and_special":
             return w, "Perfect match: elderly + special needs"
         elif maid in ["elderly_experienced", "special_needs"]:
-            return int(w * 0.6), "Partial: maid covers only one"
+            return int(w * 0.6), "Partial overlap: maid covers one aspect"
+        else:
+            return 0, "Mismatch: maid unqualified for combined care"
+
+    # Default
     return None, "Neutral"
+
 
 def score_pets(client, maid, handling):
     w = THEME_WEIGHTS["pets"]
@@ -299,6 +316,12 @@ def calculate_score(row):
     if not scores:
         return 0, "Neutral", theme_scores, []
     base_score = sum(scores) / sum(max_weights) * 100
+    # Boost only if both caregiving and other themes match well
+    if row["clientmts_special_cases"] != "unspecified" and s is not None and base_score >= 85:
+        final_score = 100
+    else:
+        final_score = min(base_score + bonus, 100)
+
     bonus, bonus_reasons = score_bonuses(row)
     final_score = min(base_score + bonus, 100)
     return round(final_score, 1), theme_scores, bonus_reasons
