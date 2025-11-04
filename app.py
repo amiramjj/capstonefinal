@@ -568,17 +568,14 @@ if uploaded_file:
     # --------------------------------------------
     df, best_client_df = None, None
     
-    # Load Tagged results (Tab 1)
-    if "results_df" in locals() and "Final Score %" in results_df.columns:
-        df = results_df.copy()
+    if "results_df" in st.session_state and "Final Score %" in st.session_state["results_df"].columns:
+        df = st.session_state["results_df"].copy()
         df["match_score_pct"] = df["Final Score %"]
     
-    # Load Optimal matches (Tab 2)
-    if "optimal_df" in locals() and "Final Score %" in optimal_df.columns:
-        best_client_df = optimal_df.copy()
+    if "optimal_df" in st.session_state and "Final Score %" in st.session_state["optimal_df"].columns:
+        best_client_df = st.session_state["optimal_df"].copy()
         best_client_df["match_score_pct"] = best_client_df["Final Score %"]
     
-    # Check both
     if df is not None and best_client_df is not None:
         st.success("✅ Using both Tab 1 (Matching Scores) and Tab 2 (Optimal Matches) for comparison.")
     elif df is not None:
